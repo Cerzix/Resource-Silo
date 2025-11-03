@@ -1,0 +1,10 @@
+{
+  "block.cerzixresourcesilo.resource_silo": "Resource Silo",
+  "item.cerzixresourcesilo.resource_silo": "Resource Silo",
+  "container.resource_silo": "Resource Silo",
+  "screen.resource_silo.title": "Resource Silo",
+  "screen.resource_silo.target": "Target",
+  "screen.resource_silo.speed": "Ticks per item: %s",
+  "itemgen.set_target": "Set Target (from held item)",
+  "item.cerzixresourcesilo.supplies": "Supplies"
+}
