@@ -17,12 +17,18 @@ public class ResourceSiloScreen extends AbstractContainerScreen<ResourceSiloMenu
         super(menu, inv, title);
         this.imageWidth = 176;
         this.imageHeight = 166;
-        this.titleLabelX = -1000; // hide default title
+        this.titleLabelX = -1000; // hide default title text
     }
 
     @Override
     protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
-        // prevent both "Supplies" title & inventory title from rendering
+        int stored = this.menu.getStoredCount();
+
+        Component line = Component.literal("Current Supplies: " + stored);
+        int x = (this.imageWidth - this.font.width(line)) / 2;
+        int y = 26; // moved down by 20px from original placement
+
+        g.drawString(this.font, line, x, y, 0x404040, false);
     }
 
     @Override

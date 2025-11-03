@@ -19,18 +19,33 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraftforge.network.NetworkHooks;
 import org.jetbrains.annotations.Nullable;
 
 public class ResourceSiloBlock extends BaseEntityBlock {
 
-    private static final VoxelShape SHAPE = box(2, 0, 2, 14, 14, 14);
+    /**
+     * Single-piece hollow shape (no overlapping boxes):
+     * - Outer: 2..14 (X/Z), 0..15.5 (Y)
+     * - Inner cavity removed: 4..12 (X/Z), 1..15.5 (Y)
+     *   -> leaves 2px thick walls and a 1px floor slab (Y=0..1), open top with rim-like walls.
+     */
+    // ---- Two-part hitbox: pallet base + box body ----
+    private static final VoxelShape SHAPE;
+    static {
+        VoxelShape pallet = box(1, 0, 1, 15, 2, 15);     // low wooden base
+        VoxelShape boxBody = box(2, 2, 2, 14, 14, 14);   // main cardboard container
 
-    public ResourceSiloBlock(BlockBehaviour.Properties props) {
-        super(props);
+        SHAPE = Shapes.or(pallet, boxBody);
     }
+
+
+
+    public ResourceSiloBlock(BlockBehaviour.Properties props) { super(props); }
 
     public ResourceSiloBlock() {
         this(BlockBehaviour.Properties.of()
@@ -48,38 +63,36 @@ public class ResourceSiloBlock extends BaseEntityBlock {
     }
 
     @Override
-    public net.minecraft.world.level.block.entity.BlockEntity newBlockEntity(
-            net.minecraft.core.BlockPos pos,
-            net.minecraft.world.level.block.state.BlockState state) {
-        return new com.cerzix.resourcesilo.blockentity.ResourceSiloBlockEntity(pos, state);
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
+        return SHAPE;
+    }
+
+    @Override
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new ResourceSiloBlockEntity(pos, state);
     }
 
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos,
                                  Player player, InteractionHand hand, BlockHitResult hit) {
-        if (!level.isClientSide) {
-            BlockEntity be = level.getBlockEntity(pos);
-            if (be instanceof ResourceSiloBlockEntity silo) {
-                // BE is a MenuProvider now
-                NetworkHooks.openScreen((ServerPlayer) player, (MenuProvider) silo,
-                        buf -> buf.writeBlockPos(pos));
-                return InteractionResult.CONSUME;
-            }
+        if (level.isClientSide) return InteractionResult.SUCCESS;
+
+        BlockEntity be = level.getBlockEntity(pos);
+        if (!(be instanceof ResourceSiloBlockEntity silo)) return InteractionResult.PASS;
+
+        if (player instanceof ServerPlayer sp) {
+            NetworkHooks.openScreen(sp, (MenuProvider) silo, pos);
         }
-        return InteractionResult.sidedSuccess(level.isClientSide);
+        return InteractionResult.CONSUME;
     }
 
+    @Nullable
     @Override
-    public <T extends net.minecraft.world.level.block.entity.BlockEntity> net.minecraft.world.level.block.entity.BlockEntityTicker<T>
-    getTicker(net.minecraft.world.level.Level level,
-              net.minecraft.world.level.block.state.BlockState state,
-              net.minecraft.world.level.block.entity.BlockEntityType<T> type) {
-        if (level.isClientSide) return null; // tick only on server
-        return (lvl, pos, st, be) -> {
-            if (be instanceof com.cerzix.resourcesilo.blockentity.ResourceSiloBlockEntity silo) {
-                com.cerzix.resourcesilo.blockentity.ResourceSiloBlockEntity.serverTick(silo);
-            }
-        };
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level,
+                                                                  BlockState state,
+                                                                  BlockEntityType<T> type) {
+        return level.isClientSide ? null
+                : createTickerHelper(type, ModBlockEntities.RESOURCE_SILO_BE.get(),
+                (lvl, p, st, be) -> ResourceSiloBlockEntity.serverTick(be));
     }
-
 }
